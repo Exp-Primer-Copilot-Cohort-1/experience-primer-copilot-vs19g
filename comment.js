@@ -1,75 +1,67 @@
 //create web server
 var express = require('express');
 var app = express();
-var bodyParser = require('body-parser');
+// create server
+var server = require('http').Server(app);
+// create socket
+var io = require('socket.io')(server);
+// create mongoose
 var mongoose = require('mongoose');
-var Schema = mongoose.Schema;
-var Comment = require('./models/comment');
-var Post = require('./models/post');
-var url = 'mongodb://localhost:27017/comment';
-var port = 3000;
-//connect to mongodb
-mongoose.connect(url);
-//use body-parser
+// create body parser
+var bodyParser = require('body-parser');
+// create model
+var Comment = require('./model/commentModel');
+
+// connect to database
+mongoose.connect('mongodb://localhost/meanstack');
+
+// create web server
+app.use(express.static('public'));
 app.use(bodyParser.urlencoded({ extended: false }));
-//use ejs
-app.set('view engine', 'ejs');
-//get all comments
-app.get('/comment', function(req, res) {
-    Comment.find({}, function(err, comments) {
-        if (err) throw err;
-        res.render('comment', { comments: comments });
+app.use(bodyParser.json());
+
+// create route
+app.get('/', function(req, res) {
+    res.sendFile(__dirname + '/public/index.html');
+});
+
+// create socket
+io.on('connection', function(socket) {
+    console.log('Co nguoi ket noi');
+    // receive data from client
+    socket.on('client-send-comment', function(data) {
+        // send data to client
+        io.sockets.emit('server-send-comment', data);
     });
 });
-//get all posts
-app.get('/post', function(req, res) {
-    Post.find({}, function(err, posts) {
-        if (err) throw err;
-        res.render('post', { posts: posts });
-    });
-});
-//add comment
+
+// create route
 app.post('/comment', function(req, res) {
     var comment = new Comment({
         name: req.body.name,
-        comment: req.body.comment,
-        post_id: req.body.post_id
+        comment: req.body.comment
     });
     comment.save(function(err) {
-        if (err) throw err;
-        console.log('Comment added');
-        res.redirect('/comment');
+        if (err) {
+            res.json({ kq: 0, errMsg: err });
+        } else {
+            res.json({ kq: 1, errMsg: '' });
+        }
     });
 });
-//add post
-app.post('/post', function(req, res) {
-    var post = new Post({
-        title: req.body.title,
-        content: req.body.content
-    });
-    post.save(function(err) {
-        if (err) throw err;
-        console.log('Post added');
-        res.redirect('/post');
-    });
-});
-//delete comment
-app.get('/comment/delete/:id', function(req, res) {
-    Comment.findByIdAndRemove(req.params.id, function(err) {
-        if (err) throw err;
-        console.log('Comment deleted');
-        res.redirect('/comment');
+
+// create route
+app.get('/comment', function(req, res) {
+    Comment.find(function(err, data) {
+        if (err) {
+            res.json({ kq: 0, errMsg: err });
+        } else {
+            res.json({ kq: 1, errMsg: '', data: data });
+        }
     });
 });
-//delete post
-app.get('/post/delete/:id', function(req, res) {
-    Post.findByIdAndRemove(req.params.id, function(err) {
-        if (err) throw err;
-        console.log('Post deleted');
-        res.redirect('/post');
-    });
+
+// create server
+server.listen(3000, function() {
+    console.log('Server is running on port 3000');
 });
-//edit comment
-app.get('/comment/edit/:id', function(req, res) {
-    Comment.findById(req.params.id, function(err, comment) {
-        if (err) throw err;
